@@ -36,14 +36,30 @@ public class TNslpPermitBill implements Serializable {
     @ApiModelProperty(value = "夜间连续施工作业许可签批单")
     private String billNo;
 
-    /** 当前所在关 0..2（窗口受理/区局核定/市局备案） */
+    /** 带出本单的点位底册行 t_nslp_point.id（单只许从点位底册记录里带出来） */
+    @TableField("point_id")
+    @JsonSerialize(using = ToStringSerializer.class)
+    @ApiModelProperty(value = "带出本单的点位底册行")
+    private Long pointId;
+
+    /** 点位码（以点位底册带出的为准） */
+    @TableField("point_no")
+    @ApiModelProperty(value = "点位码（以点位底册带出的为准）")
+    private String pointNo;
+
+    /** 区册代号（以点位底册带出的为准） */
+    @TableField("zone_no")
+    @ApiModelProperty(value = "区册代号（以点位底册带出的为准）")
+    private String zoneNo;
+
+    /** 当前所在关 0..2（窗口受理/区局核定/市局备案），凭据在签批留痕那一串，本行只回放后写回 */
     @TableField("node_no")
     @ApiModelProperty(value = "当前所在关 0..2（窗口受理/区局核定/市局备案）")
     private Integer nodeNo;
 
-    /** 本关算齐办法 0一名即过 1两名须同判 */
+    /** 本关算齐办法 0一名即过 1两条一并认可 2先落为准（三关各用各的，只此一处点出） */
     @TableField("sign_mode")
-    @ApiModelProperty(value = "本关算齐办法 0一名即过 1两名须同判")
+    @ApiModelProperty(value = "本关算齐办法 0一名即过 1两条一并认可 2先落为准")
     private Integer signMode;
 
     /** 本关应签人数 */
@@ -51,14 +67,19 @@ public class TNslpPermitBill implements Serializable {
     @ApiModelProperty(value = "本关应签人数")
     private Integer needCount;
 
-    /** 本关已到人数 */
+    /** 本关已到人数（只作逐笔累加后的回显，任何角色都没有改它的位置） */
     @TableField("sign_count")
     @ApiModelProperty(value = "本关已到人数")
     private Integer signCount;
 
-    /** 签批情形 0在签 1已点齐 2已压回 */
+    /** 当下关本轮轮次（首次到达为1，压回重走一轮加一） */
+    @TableField("cur_round")
+    @ApiModelProperty(value = "当下关本轮轮次")
+    private Integer curRound;
+
+    /** 签批情形 0在签 1已点齐 2止住（一方落不可即止住；压回退关仍是在签） */
     @TableField("status")
-    @ApiModelProperty(value = "签批情形 0在签 1已点齐 2已压回")
+    @ApiModelProperty(value = "签批情形 0在签 1已点齐 2止住")
     private Integer status;
 
     /** 删除标记 0正常 1删除 */
@@ -109,6 +130,30 @@ public class TNslpPermitBill implements Serializable {
         this.billNo = billNo;
     }
 
+    public Long getPointId() {
+        return pointId;
+    }
+
+    public void setPointId(Long pointId) {
+        this.pointId = pointId;
+    }
+
+    public String getPointNo() {
+        return pointNo;
+    }
+
+    public void setPointNo(String pointNo) {
+        this.pointNo = pointNo;
+    }
+
+    public String getZoneNo() {
+        return zoneNo;
+    }
+
+    public void setZoneNo(String zoneNo) {
+        this.zoneNo = zoneNo;
+    }
+
     public Integer getNodeNo() {
         return nodeNo;
     }
@@ -139,6 +184,14 @@ public class TNslpPermitBill implements Serializable {
 
     public void setSignCount(Integer signCount) {
         this.signCount = signCount;
+    }
+
+    public Integer getCurRound() {
+        return curRound;
+    }
+
+    public void setCurRound(Integer curRound) {
+        this.curRound = curRound;
     }
 
     public Integer getStatus() {
