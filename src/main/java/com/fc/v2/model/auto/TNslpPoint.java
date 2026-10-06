@@ -101,6 +101,11 @@ public class TNslpPoint implements Serializable {
     @ApiModelProperty(value = "就地叫停 0在走 1已叫停")
     private Integer stopFlag;
 
+    /** 夜间连续施工档 0未准 1已准（只随签批单点齐同一回改口并附履历） */
+    @TableField("night_permit")
+    @ApiModelProperty(value = "夜间连续施工档 0未准 1已准")
+    private Integer nightPermit;
+
     /** 归层时钉住的线代号；不归层清成空白（日后追得出当年照的是哪条线） */
     @TableField("pinned_rule_code")
     @ApiModelProperty(value = "归层钉住的线代号，不归层为空白")
@@ -262,6 +267,14 @@ public class TNslpPoint implements Serializable {
 
     public void setStopFlag(Integer stopFlag) {
         this.stopFlag = stopFlag;
+    }
+
+    public Integer getNightPermit() {
+        return nightPermit;
+    }
+
+    public void setNightPermit(Integer nightPermit) {
+        this.nightPermit = nightPermit;
     }
 
     public String getPinnedRuleCode() {

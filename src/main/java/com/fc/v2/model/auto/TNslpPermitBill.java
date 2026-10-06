@@ -36,14 +36,24 @@ public class TNslpPermitBill implements Serializable {
     @ApiModelProperty(value = "夜间连续施工作业许可签批单")
     private String billNo;
 
-    /** 当前所在关 0..2（窗口受理/区局核定/市局备案） */
+    /** 点位码（只从点位底册带出，一处点位一次夜间连续施工只摊上一张） */
+    @TableField("point_no")
+    @ApiModelProperty(value = "点位码（只从点位底册带出）")
+    private String pointNo;
+
+    /** 区册代号（随点位底册带出，以底册为准） */
+    @TableField("zone_no")
+    @ApiModelProperty(value = "区册代号（随点位底册带出）")
+    private String zoneNo;
+
+    /** 当前所在段 0..2（窗口受理/区局核定/市局备案；段次由后端数，报文自带的不采信） */
     @TableField("node_no")
-    @ApiModelProperty(value = "当前所在关 0..2（窗口受理/区局核定/市局备案）")
+    @ApiModelProperty(value = "当前所在段 0..2（窗口受理/区局核定/市局备案）")
     private Integer nodeNo;
 
-    /** 本关算齐办法 0一名即过 1两名须同判 */
+    /** 本段算齐办法 0一名即过 1先落笔那一方为准 2两名一并认可 */
     @TableField("sign_mode")
-    @ApiModelProperty(value = "本关算齐办法 0一名即过 1两名须同判")
+    @ApiModelProperty(value = "本段算齐办法 0一名即过 1先落笔那一方为准 2两名一并认可")
     private Integer signMode;
 
     /** 本关应签人数 */
@@ -56,10 +66,26 @@ public class TNslpPermitBill implements Serializable {
     @ApiModelProperty(value = "本关已到人数")
     private Integer signCount;
 
-    /** 签批情形 0在签 1已点齐 2已压回 */
+    /** 签批情形 0在签（含压回重走） 1已点齐封住 */
     @TableField("status")
-    @ApiModelProperty(value = "签批情形 0在签 1已点齐 2已压回")
+    @ApiModelProperty(value = "签批情形 0在签 1已点齐封住")
     private Integer status;
+
+    /** 走到第几趟（压回本段重走为新一趟，更早各段旧笔一笔不动） */
+    @TableField("round_no")
+    @ApiModelProperty(value = "走到第几趟（压回重走的段本轮加一）")
+    private Integer roundNo;
+
+    /** 止住 0在走 1已止住（有一方落不可即止住，冻结不接笔） */
+    @TableField("stop_flag")
+    @ApiModelProperty(value = "止住 0在走 1已止住")
+    private Integer stopFlag;
+
+    /** 点齐封住那一刻（走满三段写回本行） */
+    @TableField("seal_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "点齐封住那一刻")
+    private Date sealTime;
 
     /** 删除标记 0正常 1删除 */
     @TableField("del_flag")
@@ -109,6 +135,22 @@ public class TNslpPermitBill implements Serializable {
         this.billNo = billNo;
     }
 
+    public String getPointNo() {
+        return pointNo;
+    }
+
+    public void setPointNo(String pointNo) {
+        this.pointNo = pointNo;
+    }
+
+    public String getZoneNo() {
+        return zoneNo;
+    }
+
+    public void setZoneNo(String zoneNo) {
+        this.zoneNo = zoneNo;
+    }
+
     public Integer getNodeNo() {
         return nodeNo;
     }
@@ -147,6 +189,30 @@ public class TNslpPermitBill implements Serializable {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public Integer getRoundNo() {
+        return roundNo;
+    }
+
+    public void setRoundNo(Integer roundNo) {
+        this.roundNo = roundNo;
+    }
+
+    public Integer getStopFlag() {
+        return stopFlag;
+    }
+
+    public void setStopFlag(Integer stopFlag) {
+        this.stopFlag = stopFlag;
+    }
+
+    public Date getSealTime() {
+        return sealTime;
+    }
+
+    public void setSealTime(Date sealTime) {
+        this.sealTime = sealTime;
     }
 
     public Integer getDelFlag() {

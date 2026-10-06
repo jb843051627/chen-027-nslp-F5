@@ -246,6 +246,92 @@ CREATE TABLE IF NOT EXISTS t_nslp_point_step (
   KEY idx_point_step (point_id, step_time, seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='点位三态留痕（一步一笔，档由这一串放出来）';
 
+-- ============================================================================
+-- 夜间连续施工作业许可签批单：三段签批（收件 1／认定 2 先落为准／存备 2 同认）＋
+-- 逐笔签署、段趟留痕、封住改口点位主档并附变更履历。旧列一条不动，只加列、另立新表。
+-- 列名与基线实体契约逐列对齐，改列必须同步实体。
+-- ============================================================================
+
+-- 签批单主表加五列：
+-- point_no   单子只许从点位底册记录里带出来的点位码（前端没有自己新建的口子）。
+-- zone_no    区册代号（随点位底册带出，以底册为准）。
+-- round_no   走到第几趟：压回一关再重走，本段本轮加一趟；更早各段的旧笔不抹。
+-- stop_flag  止住 0在走 1已止住（任一方落「不可」当即止住，此后任何段再落的笔都不采信）。
+-- seal_time  点齐封住那一刻（走满三段写回本行；页首在签张数据此同源减一）。
+-- sign_mode 注释随三套数法校正：0一名即过（段一）／1先落笔那一方为准（段二）／2两名一并认可（段三）。
+ALTER TABLE t_nslp_permit_bill
+  ADD COLUMN point_no varchar(64) DEFAULT NULL COMMENT '点位码（只从点位底册带出，一处点位一次夜间连续施工一张）' AFTER bill_no,
+  ADD COLUMN zone_no varchar(64) DEFAULT NULL COMMENT '区册代号（随点位底册带出，以底册为准）' AFTER point_no,
+  ADD COLUMN round_no int DEFAULT 1 COMMENT '走到第几趟（压回重走的段本轮加一，旧趟旧笔一笔不动）' AFTER status,
+  ADD COLUMN stop_flag int DEFAULT 0 COMMENT '止住 0在走 1已止住（有一方落不可即止住，冻结不接笔）' AFTER round_no,
+  ADD COLUMN seal_time datetime DEFAULT NULL COMMENT '点齐封住那一刻（走满三段写回本行）' AFTER stop_flag,
+  MODIFY COLUMN sign_mode int DEFAULT NULL COMMENT '本关算齐办法 0一名即过 1先落笔那一方为准 2两名一并认可',
+  ADD KEY idx_point_open (point_no, status, stop_flag, del_flag);
+
+-- 逐笔签署：一人一笔、各记各的落单时刻；已到几人只由这一串逐笔累出来，屏显只是回显。
+-- 压回只抹本段本轮（active_flag=1）的笔：旧趟旧行一笔不动，仍一条一条查得着。
+CREATE TABLE IF NOT EXISTS t_nslp_permit_sign (
+  id bigint NOT NULL COMMENT '主键',
+  bill_id bigint NOT NULL COMMENT '所随签批单 t_nslp_permit_bill.id',
+  node_no int DEFAULT NULL COMMENT '落笔那一刻服务端数出的段 0..2（报文写的段不采信）',
+  round_no int DEFAULT NULL COMMENT '这一笔属第几趟（压回重走为新一趟）',
+  signer varchar(64) DEFAULT NULL COMMENT '落笔人（两名各落各的，同一个抵不得两笔）',
+  verdict varchar(16) DEFAULT NULL COMMENT '意见原话 可／不可',
+  note varchar(500) DEFAULT NULL COMMENT '这一笔的原话（两方文本都进库，屏上两行都摆得出来）',
+  sign_time datetime DEFAULT NULL COMMENT '落单那一刻（同刻两笔各记各的，按本列排先后不许并成一笔）',
+  seq int DEFAULT NULL COMMENT '同刻先后次序（sign_time 并列时以本列断先后）',
+  active_flag int DEFAULT 1 COMMENT '本轮有效 1本轮算数 0已被压回腾掉（行仍在，旧笔查得着，不计已到人数）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  PRIMARY KEY (id),
+  KEY idx_bill_round_node (bill_id, round_no, node_no, active_flag, del_flag),
+  KEY idx_bill_time (bill_id, sign_time, seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='签批单逐笔签署（一人一笔，已到人数只由这串累出）';
+
+-- 单子流转留痕：立单／落笔／挪前／压回／止住／分歧挂起／点齐，按时序压在单身后。
+-- 改档（主表 node_no）与留痕同一事务；当前段只由这一串放出来，事后捋账只取这一串。
+CREATE TABLE IF NOT EXISTS t_nslp_permit_trail (
+  id bigint NOT NULL COMMENT '主键',
+  bill_id bigint NOT NULL COMMENT '所随签批单 t_nslp_permit_bill.id',
+  node_no int DEFAULT NULL COMMENT '落笔那一刻单子所处段 0..2',
+  round_no int DEFAULT NULL COMMENT '落笔那一刻走到的趟次',
+  action varchar(32) DEFAULT NULL COMMENT '动作 立单/落笔/挪前/压回/止住/分歧挂起/点齐',
+  note varchar(500) DEFAULT NULL COMMENT '这一笔留下的话（原话或动作按语）',
+  trail_time datetime DEFAULT NULL COMMENT '提交那一刻（同刻两笔各记各的先后）',
+  seq int DEFAULT NULL COMMENT '同刻先后次序（trail_time 并列时以本列断先后）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  PRIMARY KEY (id),
+  KEY idx_bill_trail (bill_id, trail_time, seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='签批单流转留痕（一段一句，按时序压在身后）';
+
+-- 点位主档改口履历：签批单走满三段点齐那一刻，点位行夜间施工档由未准改为准许，
+-- 与主档改动出自同一回处理（同事务、同一次计算）；对不住时凭 bill_id/bill_no 指名报出对应单据。
+CREATE TABLE IF NOT EXISTS t_nslp_point_permit_hist (
+  id bigint NOT NULL COMMENT '主键',
+  point_id bigint NOT NULL COMMENT '所随点位 t_nslp_point.id',
+  point_no varchar(64) DEFAULT NULL COMMENT '点位码（冗余自点位行）',
+  bill_id bigint NOT NULL COMMENT '依据哪一张签批单 t_nslp_permit_bill.id',
+  bill_no varchar(64) DEFAULT NULL COMMENT '依据的签批单单号',
+  operator varchar(64) DEFAULT NULL COMMENT '这一改由谁落（封住那一笔的落笔人）',
+  from_flag int DEFAULT NULL COMMENT '从哪一档 0夜间施工未准',
+  to_flag int DEFAULT NULL COMMENT '改到哪一档 1夜间连续施工已准',
+  change_time datetime DEFAULT NULL COMMENT '改口那一刻（与主档更新、单据封住同一刻）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  PRIMARY KEY (id),
+  KEY idx_point_hist (point_id, change_time),
+  KEY idx_bill_hist (bill_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='点位夜间施工档变更履历（改口必附，与主档同一回处理）';
+
+-- 点位底册加一列：夜间连续施工档。默认 0 未准；只随一张签批单走满三段点齐、同一回处理里
+-- 改成 1 已准，并在 t_nslp_point_permit_hist 追加一条履历。别处一律不动这一格。
+ALTER TABLE t_nslp_point
+  ADD COLUMN night_permit int DEFAULT 0 COMMENT '夜间连续施工档 0未准 1已准（只随签批单点齐同一回改口并附履历）' AFTER stop_flag;
+
 -- 文书出文留档：一纸文书落一次档。出文照哪一版取值，落笔时把那一版主键、版次、
 -- 三个数钉在本档；往后新立一版不回改旧档（前年新版措辞回灌旧文的事今后一处也不许有）。
 CREATE TABLE IF NOT EXISTS t_nslp_doc_issue (
